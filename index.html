@@ -218,11 +218,11 @@ function frameArea( sizeToFitOnScreen, boxSize, boxCenter, camera ) {
 
 {
 const mtlLoader = new MTLLoader();
-mtlLoader.load('cottage_obj.mtl', (mtl) => {
+mtlLoader.load('Mesh_Pig.mtl', (mtl) => {
   mtl.preload();
   const objLoader = new OBJLoader();
   objLoader.setMaterials(mtl);
-  objLoader.load('cottage_obj.obj', (root) => {
+  objLoader.load('Mesh_Pig.obj', (root) => {
 
     root.position.set(10, 1400, 10);
 
