@@ -224,6 +224,8 @@ mtlLoader.load('Mesh_Pig.mtl', (mtl) => {
   objLoader.setMaterials(mtl);
   objLoader.load('Mesh_Pig.obj', (root) => {
 
+    root.position.set(10, 10, 10);
+
     scene.add(root);
 
     // Compute the box that contains all the stuff from root and below
