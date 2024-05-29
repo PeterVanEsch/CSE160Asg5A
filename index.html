@@ -39,6 +39,14 @@
             font-size: 24px;
             color: Black;
         }
+        #explain {
+            position: absolute;
+            top: 70px;
+            left: 130px;
+            z-index: 100;
+            font-size: 20px;
+            color: Black;
+        }
 #c {
   width: 100%;
   height: 100%;
@@ -59,6 +67,7 @@
       <input type="range" id="UpDownAngleSlider" min="-180" max="0" value="0">
   </div>
 
+ <div id="explain">Switch between global view, Pig view, and Scarecrow view</div>
   <button id="switchCameraButton">Switch Camera</button>
   <div id="message">Task: Kill the pig. Press P to fire. </div>
     <canvas id="c" data-engine="three.js r163"></canvas>
@@ -368,6 +377,32 @@ function updateBullets() {
 
 }
 
+let wings = new THREE.Group();
+{
+
+const mtlLoader = new MTLLoader();
+mtlLoader.load( 'wings.mtl', ( mtl ) => {
+
+  mtl.preload();
+  const objLoader = new OBJLoader();
+  objLoader.setMaterials( mtl );
+  objLoader.load( 'wings.obj', ( root ) => {
+
+    root.position.set(1340,380, 840);
+    root.scale.set(2,2,2);
+    wings = root;
+    scene.add( root );
+
+    
+  } );
+
+} );
+
+}
+
+
+
+
 function createPigBoundingBox(pig) {
             pigBoundingBox = new THREE.Box3().setFromObject(pig);
         }
@@ -659,6 +694,13 @@ function switchCamera() {
       switchCam = 0;
     }
 }
+let flapX = 0;
+let flapZ = 0;
+
+
+// Create the line
+//const directionLine = new THREE.Line(lineGeometry, lineMaterial);
+
 
 function animatePig() {
     
@@ -679,18 +721,32 @@ function animatePig() {
 
         // Calculate the direction vector
         const direction = new THREE.Vector3(nextPigX - pigX, 0, nextPigZ - pigz).normalize();
+        const perpendicularDirection = new THREE.Vector3(-direction.z, 0, direction.x).normalize();
     // Increment the parameter
     if (!globalKilled){
     piggy.position.set(pigX, 1400, pigz); // Adjust the z-axis if needed
+    wings.position.set(pigX, 1400, pigz );
     const angle = Math.atan2(direction.x, direction.z);
-        piggy.rotation.y = angle;
 
+        const perpendicularDirection = new THREE.Vector3(-direction.z, 0, direction.x).normalize();
+        const wingFlapRotation = Math.PI / 4 * Math.sin(Date.now() * 0.01);
+        wings.setRotationFromAxisAngle(perpendicularDirection, wingFlapRotation);
+        piggy.rotation.y = angle;
+        wings.rotation.y = angle;
+        
+        
+        
+        
+
+        
     }
     else{
       piggy.position.y -= 0.01; // Adjust the speed of the drop as needed
+      wings.position.y -= 0.01;
         if (piggy.position.y < 0) {
             piggy.position.y = 0; // Stop the pig from falling below the ground
             piggy.rotation.z = 90;
+            wings.rotation.z = 90;
         }
     }
 
