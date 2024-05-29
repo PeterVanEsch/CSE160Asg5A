@@ -9,6 +9,36 @@
   margin: 0;
   height: 100%;
 }
+
+#sliderContainer {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            z-index: 100;
+        }
+
+        #upDownsliderContainer {
+            position: absolute;
+            top: 40px;
+            left: 20px;
+            z-index: 100;
+        }
+
+        #switchCameraButton {
+            position: absolute;
+            top: 70px;
+            left: 20px;
+            z-index: 100;
+        }
+
+        #message {
+            position: absolute;
+            top: 120px;
+            left: 20px;
+            z-index: 100;
+            font-size: 24px;
+            color: Black;
+        }
 #c {
   width: 100%;
   height: 100%;
@@ -18,6 +48,19 @@
   </head>
 
   <body>
+    <div id="sliderContainer">
+      <label for="angleSlider">Shooting Angle:</label>
+      <input type="range" id="angleSlider" min="-175" max="40" value="-70">
+  </div>
+
+  <body>
+    <div id="upDownsliderContainer">
+      <label for="angleSlider">Up and Down Shooting Angle:</label>
+      <input type="range" id="UpDownAngleSlider" min="-180" max="0" value="0">
+  </div>
+
+  <button id="switchCameraButton">Switch Camera</button>
+  <div id="message">Task: Kill the pig. Press P to fire. </div>
     <canvas id="c" data-engine="three.js r163"></canvas>
     <script  type="importmap">{
         "imports": {
@@ -37,7 +80,7 @@ function main() {
 
 const canvas = document.querySelector( '#c' );
 const renderer = new THREE.WebGLRenderer( { antialias: true, canvas } );
-
+let globalKilled = false;
 const fov = 45;
 const aspect = 2; // the canvas default
 const near = 0.1;
@@ -183,6 +226,114 @@ function frameArea( sizeToFitOnScreen, boxSize, boxCenter, camera ) {
 
 }
 
+document.addEventListener('keydown', (event) => {
+    if (event.key.toLowerCase() === 'p') {
+        shootBullet();
+    }
+});
+
+function createBulletBoundingBox(bullet) {
+            return new THREE.Box3().setFromObject(bullet);
+        }
+
+const bullets = []; // Array to hold the bullets
+const bulletSpeed = 10; // Speed at which bullets move
+const angleSlider = document.getElementById('angleSlider');
+const upDownangleSlider = document.getElementById('UpDownAngleSlider');
+const messageDiv = document.getElementById('message');
+
+let helperLine;
+const startPoint = new THREE.Vector3(1000, 380, 1000);
+const lineLength = 500;
+const endPointerBeigner = new THREE.Vector3(startPoint.x + lineLength * Math.cos(-1.22173), startPoint.y + lineLength * Math.cos(0), startPoint.z + lineLength * Math.sin(-1.22173));
+
+
+function createHelperLine() {
+    const material = new THREE.LineBasicMaterial({ color: 0x00ff00 });
+    const points = [startPoint, endPointerBeigner];
+    const geometry = new THREE.BufferGeometry().setFromPoints(points);
+
+    helperLine = new THREE.Line(geometry, material);
+    scene.add(helperLine);
+}
+
+function updateHelperLine() {
+    const angle = THREE.MathUtils.degToRad(angleSlider.value);
+    const angle2 = THREE.MathUtils.degToRad(upDownangleSlider.value);
+
+    const endPoint = new THREE.Vector3(
+        startPoint.x + lineLength * Math.cos(angle) ,
+        startPoint.y + lineLength * Math.cos(angle2),
+        startPoint.z + lineLength * Math.sin(angle)
+    );
+
+    helperLine.geometry.setFromPoints([startPoint, endPoint]);
+}
+
+createHelperLine();
+angleSlider.addEventListener('input', updateHelperLine);
+upDownangleSlider.addEventListener('input', updateHelperLine);
+
+
+
+function shootBullet() {
+    // Create a small cube
+    const geometry = new THREE.BoxGeometry(5, 15, 5);
+    const material = new THREE.MeshPhongMaterial({ color: 0xff0000 , emissive: 0xff0000,
+                emissiveIntensity: 4});
+    const bullet = new THREE.Mesh(geometry, material);
+
+    const angle = THREE.MathUtils.degToRad(angleSlider.value);
+    const angle2 = THREE.MathUtils.degToRad(upDownangleSlider.value);
+    // Set the initial position of the bullet
+    bullet.position.set(1000, 380, 1000); // y is 0, adjust as necessary
+
+    // Add the bullet to the scene
+    scene.add(bullet);
+
+
+    let Xspray = (Math.random() - 0.5)  * 0.7;
+    console.log(Xspray);
+
+    let Yspray = (Math.random() - 0.5) * 0.7 ;
+    let Zspray = (Math.random() - 0.5) * 0.7;
+
+    const velocitys = new THREE.Vector3(
+                bulletSpeed * Math.cos(angle) + Xspray,
+                bulletSpeed * Math.cos(angle2) + Yspray,
+                bulletSpeed * Math.sin(angle) + Zspray
+            );
+
+    const bulletBoundingBox = createBulletBoundingBox(bullet);
+    // Add the bullet to the bullets array with initial velocity
+    bullets.push({ mesh: bullet, velocity: velocitys, boundingBox: bulletBoundingBox  });
+}
+
+function updateBullets() {
+    for (let i = 0; i < bullets.length; i++) {
+        const bullet = bullets[i];
+        bullet.mesh.position.add(bullet.velocity);
+        bullet.boundingBox.setFromObject(bullet.mesh);
+
+        if (pigBoundingBox && pigBoundingBox.intersectsBox(bullet.boundingBox)) {
+                    console.log('Bullet hit the pig!');
+                    scene.remove(bullet.mesh);
+                    bullets.splice(i, 1);
+                    i--; // Adjust index after removal
+                    messageDiv.textContent = 'Congrats! You killed the pig!';
+                    globalKilled = true;
+                    continue;
+                }
+
+        // Optionally, remove bullets that are out of view to optimize performance
+        if (bullet.mesh.position.y > 3000) { // Adjust the boundary as needed
+            scene.remove(bullet.mesh);
+            bullets.splice(i, 1);
+            i--; // Adjust index after removal
+        }
+    }
+}
+
 {
 
   const mtlLoader = new MTLLoader();
@@ -193,6 +344,7 @@ function frameArea( sizeToFitOnScreen, boxSize, boxCenter, camera ) {
     objLoader.setMaterials( mtl );
     objLoader.load( 'https://threejs.org/manual/examples/resources/models/windmill_2/windmill.obj', ( root ) => {
 
+      root.position.set(0,0, -800);
       scene.add( root );
 
       // compute the box that contains all the stuff
@@ -216,37 +368,130 @@ function frameArea( sizeToFitOnScreen, boxSize, boxCenter, camera ) {
 
 }
 
-{
-const mtlLoader = new MTLLoader();
-mtlLoader.load('Mesh_Pig.mtl', (mtl) => {
-  mtl.preload();
-  const objLoader = new OBJLoader();
-  objLoader.setMaterials(mtl);
-  objLoader.load('Mesh_Pig.obj', (root) => {
+function createPigBoundingBox(pig) {
+            pigBoundingBox = new THREE.Box3().setFromObject(pig);
+        }
+let pigBoundingBox;
 
-    root.position.set(10, 1400, 10);
+let piggyX = 1340;
+let piggyY = 380;
+let piggyZ = 840;
+    let piggy = new THREE.Group();
+    {
+        const mtlLoader = new MTLLoader();
+        mtlLoader.load('Mesh_Pig.mtl', (mtl) => {
+            mtl.preload();
+            const objLoader = new OBJLoader();
+            objLoader.setMaterials(mtl);
+            objLoader.load('Mesh_Pig.obj', (root) => {
+                root.traverse((child) => {
+                    if (child instanceof THREE.Mesh) {
+                        // Create a basic material with the existing texture
+                        const basicMaterial = new THREE.MeshPhongMaterial({ map: child.material.map });
+                        child.material = basicMaterial;
+                    }
+                });
+                root.position.set(piggyX, piggyY, piggyZ);
+                root.scale.set(2, 2, 2);
+                piggy = root;
+                createPigBoundingBox(piggy);
+                scene.add(root);
+                
+                ///animatePig();
+            });
+        });
+    
+      }
 
-    scene.add(root);
+      //console.log(piggy.position);
 
-    // Compute the box that contains all the stuff from root and below
-    const box = new THREE.Box3().setFromObject(root);
 
-    const boxSize = box.getSize(new THREE.Vector3()).length();
-    const boxCenter = box.getCenter(new THREE.Vector3());
 
-    // Set the camera to frame the box
-    frameArea(boxSize * 1.2, boxSize, boxCenter, camera);
 
-    // Update the Trackball controls to handle the new size
-    controls.maxDistance = boxSize * 10;
-    controls.target.copy(boxCenter);
-    controls.update();
+      {
+        const mtlLoader = new MTLLoader();
+        mtlLoader.load('PUSHILIN_rainbow.mtl', (mtl) => {
+            mtl.preload();
+            const objLoader = new OBJLoader();
+            objLoader.setMaterials(mtl);
+            objLoader.load('PUSHILIN_rainbow.obj', (root) => {
+                root.traverse((child) => {
+                    if (child instanceof THREE.Mesh) {
+                        // Create a basic material with the existing texture
+                        const basicMaterial = new THREE.MeshPhongMaterial({ map: child.material.map });
+                        child.material = basicMaterial;
+                    }
+                });
+                root.position.set(0, 0, -10000);
+                root.scale.set(3900, 3900, 3900);
+                scene.add(root);
+                
+                ///animatePig();
+            });
+        });
+    
+      }
 
-  });
-});
 
-}
 
+
+      let Scarecrow = new THREE.Group();;
+      {
+        const mtlLoader = new MTLLoader();
+        mtlLoader.load('Scarecrow.mtl', (mtl) => {
+            mtl.preload();
+            const objLoader = new OBJLoader();
+            objLoader.setMaterials(mtl);
+            objLoader.load('Scarecrow.obj', (root) => {
+                root.traverse((child) => {
+                    if (child instanceof THREE.Mesh) {
+                        // Create a basic material with the existing texture
+                        const basicMaterial = new THREE.MeshPhongMaterial({ map: child.material.map });
+                        child.material = basicMaterial;
+                    }
+                });
+                root.position.set(1000, 0, 1000);
+                root.scale.set(130, 130, 130);
+                
+                Scarecrow = root;
+                Scarecrow.rotation.y = (180);
+                scene.add(Scarecrow);
+                
+                ///animatePig();
+            });
+        });
+    
+      }
+
+      let switchCam = 0;
+
+      {
+
+const loader = new THREE.CubeTextureLoader();
+const texture = loader.load( [
+
+'yellowcloud_ft.jpg',
+'yellowcloud_bk.jpg',
+'yellowcloud_up.jpg',
+'yellowcloud_dn.jpg',
+'yellowcloud_rt.jpg',
+'yellowcloud_lf.jpg',
+
+] );
+scene.background = texture;
+
+};
+
+const cubeTextureLoader = new THREE.CubeTextureLoader();
+const envMap = cubeTextureLoader.load([
+  'yellowcloud_ft.jpg', 'yellowcloud_bk.jpg',
+  'yellowcloud_up.jpg', 'yellowcloud_dn.jpg',
+  'yellowcloud_rt.jpg', 'yellowcloud_lf.jpg'
+]);
+
+envMap.encoding = THREE.sRGBEncoding;
+envMap.format = THREE.RGBAFormat;
+envMap.type = THREE.UnsignedByteType;
 
 
 
@@ -400,6 +645,115 @@ function animateSun() {
 }
 
 
+let pigT = 0; // Parameter for the figure-8 motion
+const pigSpeed = 0.000001; // Speed of the pig's movement
+const pigAmplitudeX = 2000; // Amplitude of the x-axis movement
+const pigAmplitudez = 2000; // Amplitude of the y-axis movement
+
+const switchCameraButton = document.getElementById('switchCameraButton');
+    switchCameraButton.addEventListener('click', switchCamera);
+
+function switchCamera() {
+    switchCam  += 1;
+    if ( switchCam == 3){
+      switchCam = 0;
+    }
+}
+
+function animatePig() {
+    
+    // Calculate the new position using the figure-8 equations
+    const pigX = pigAmplitudeX * Math.sin(pigT);
+    const pigz = pigAmplitudez * Math.sin(pigT) * Math.cos(pigT);
+
+    // Update the position of the pig model
+    //if (pig) { // Ensure the pig model is loaded
+        //piggyX = pigX;
+        //piggyY = pigY;
+
+
+    //}
+    const nextPigT = pigT + pigSpeed;
+        const nextPigX = pigAmplitudeX * Math.sin(nextPigT);
+        const nextPigZ = pigAmplitudez * Math.sin(nextPigT) * Math.cos(nextPigT);
+
+        // Calculate the direction vector
+        const direction = new THREE.Vector3(nextPigX - pigX, 0, nextPigZ - pigz).normalize();
+    // Increment the parameter
+    if (!globalKilled){
+    piggy.position.set(pigX, 1400, pigz); // Adjust the z-axis if needed
+    const angle = Math.atan2(direction.x, direction.z);
+        piggy.rotation.y = angle;
+
+    }
+    else{
+      piggy.position.y -= 0.01; // Adjust the speed of the drop as needed
+        if (piggy.position.y < 0) {
+            piggy.position.y = 0; // Stop the pig from falling below the ground
+            piggy.rotation.z = 90;
+        }
+    }
+
+        if ( switchCam == 2){
+          if (!globalKilled){
+          camera.position.set(Scarecrow.position.x, Scarecrow.position.y + 490, Scarecrow.position.z);
+          const lookAtTarget = new THREE.Vector3(
+            pigX + direction.x,
+            piggy.position.y, // Maintain the camera's height
+            pigz + direction.z);
+            camera.lookAt(lookAtTarget);
+
+          }
+          else{
+            camera.position.set(Scarecrow.position.x, Scarecrow.position.y + 490, Scarecrow.position.z);
+            const lookAtTarget = new THREE.Vector3(
+            piggy.position.x,
+            piggy.position.y, // Maintain the camera's height
+            piggy.position.z);
+            camera.lookAt(lookAtTarget);
+          }
+        
+
+        }
+
+        else if ( switchCam == 1){
+
+          if (!globalKilled){
+        camera.position.set(pigX, piggy.position.y + 10, pigz); 
+        
+        const lookAtTarget = new THREE.Vector3(
+            pigX + direction.x,
+            piggy.position.y + 10, // Maintain the camera's height
+            pigz + direction.z
+        );
+        camera.lookAt(lookAtTarget);
+        }
+
+
+        else{
+        camera.position.set(piggy.position.x, piggy.position.y , piggy.position.z);
+        const lookAtTarget = new THREE.Vector3(
+          piggy.position.x,
+            10, // Maintain the camera's height
+            piggy.position.z
+        );
+        camera.lookAt(lookAtTarget);
+
+      }
+      }
+
+      
+
+        createPigBoundingBox(piggy);
+        pigBoundingBox.setFromObject(piggy);
+    pigT += pigSpeed;
+
+
+    // Request the next frame
+    requestAnimationFrame(animatePig);
+}
+
+
 
 //barn 
 {
@@ -475,7 +829,13 @@ const cylinderGeo = new THREE.CylinderGeometry(
   cylinderHeightSegments,
   cylinderOpenEnded
 );
-const cylinderMat = new THREE.MeshPhongMaterial({ color: '#268ded' });
+const cylinderMat = new THREE.MeshPhongMaterial({ color: '#268ded', envMap: envMap,
+    combine: THREE.MixOperation,
+    reflectivity: 0.3,
+    emissive: 0x0000ff,
+    emissiveIntensity: 0.3,
+    specular: 0x111111,
+    shininess: 100});
 const cylinderMesh = new THREE.Mesh(cylinderGeo, cylinderMat);
 cylinderMesh.position.set(-1200, 100, 1200); // Set position as needed
 scene.add(cylinderMesh);
@@ -590,6 +950,85 @@ pyramidMesh.position.set(1200, 660, -1200); // Set position as needed
 scene.add(pyramidMesh);
 };
 
+
+
+{
+    const coneRadiusBottom = 300; // Radius of the base of the cone
+    const coneHeight = 200; // Height of the cone
+    const coneRadialSegments = 32; // Number of segmented faces around the circumference of the cone
+    const coneHeightSegments = 1; // Number of rows of faces along the height of the cone
+    const coneOpenEnded = false; // Whether the base of the cone is open or capped
+
+    const coneGeo = new THREE.CylinderGeometry(
+        0, // Radius at the top of the cone (0 for a cone)
+        coneRadiusBottom, // Radius at the bottom of the cone
+        coneHeight, // Height of the cone
+        coneRadialSegments, // Number of segmented faces around the circumference
+        coneHeightSegments, // Number of rows of faces along the height
+        coneOpenEnded // Whether the base of the cone is open or capped
+    );
+
+    const coneMat = new THREE.MeshPhongMaterial({ color: '#473611' }); // Material for the cone
+    const coneMesh = new THREE.Mesh(coneGeo, coneMat);
+    coneMesh.position.set(0, 0, 0); // Set position as needed
+    coneMesh.scale.set(10, 10, 10);
+    coneMesh.rotation.x = Math.PI;
+    coneMesh.position.set(0,-1040,0)
+    scene.add(coneMesh);
+};
+
+
+{
+    const coneRadiusBottom = 140; // Radius of the base of the cone
+    const coneHeight = 180; // Height of the cone
+    const coneRadialSegments = 32; // Number of segmented faces around the circumference of the cone
+    const coneHeightSegments = 1; // Number of rows of faces along the height of the cone
+    const coneOpenEnded = false; // Whether the base of the cone is open or capped
+
+    const coneGeo = new THREE.CylinderGeometry(
+        0, // Radius at the top of the cone (0 for a cone)
+        coneRadiusBottom, // Radius at the bottom of the cone
+        coneHeight, // Height of the cone
+        coneRadialSegments, // Number of segmented faces around the circumference
+        coneHeightSegments, // Number of rows of faces along the height
+        coneOpenEnded // Whether the base of the cone is open or capped
+    );
+
+    const coneMat = new THREE.MeshPhongMaterial({ color: '#473611' }); // Material for the cone
+    const coneMesh = new THREE.Mesh(coneGeo, coneMat);
+    coneMesh.position.set(0, 0, 0); // Set position as needed
+    coneMesh.scale.set(10, 10, 10);
+    coneMesh.rotation.x = Math.PI;
+    coneMesh.position.set(1000,-1240,0)
+    scene.add(coneMesh);
+};
+
+
+
+{
+  const cylinderRadiusTop = 284;
+const cylinderRadiusBottom = 284;
+const cylinderHeight = 7;
+const cylinderRadialSegments = 32;
+const cylinderHeightSegments = 1;
+const cylinderOpenEnded = false;
+
+const cylinderGeo = new THREE.CylinderGeometry(
+  cylinderRadiusTop,
+  cylinderRadiusBottom,
+  cylinderHeight,
+  cylinderRadialSegments,
+  cylinderHeightSegments,
+  cylinderOpenEnded
+);
+const cylinderMat = new THREE.MeshPhongMaterial({ color: '#96ba6c'});
+const cylinderMesh = new THREE.Mesh(cylinderGeo, cylinderMat);
+cylinderMesh.scale.set(10, 10, 10);
+cylinderMesh.position.set(0, -50, 0); // Set position as needed
+scene.add(cylinderMesh);
+};
+
+
 // house itslef
 {
 
@@ -669,22 +1108,7 @@ const flowergeometry = new THREE.BoxGeometry( flowerboxWidth, flowerboxHeight, f
   scene.add( flowercube10 );
 	
 };
-{
 
-const loader = new THREE.CubeTextureLoader();
-const texture = loader.load( [
-
-'yellowcloud_ft.jpg',
-'yellowcloud_bk.jpg',
-'yellowcloud_up.jpg',
-'yellowcloud_dn.jpg',
-'yellowcloud_rt.jpg',
-'yellowcloud_lf.jpg',
-
-] );
-scene.background = texture;
-
-};
 
 function resizeRendererToDisplaySize( renderer ) {
 
@@ -713,6 +1137,8 @@ function render() {
   }
   
   animateSun();
+  animatePig();
+  updateBullets();
   renderer.render( scene, camera );
 
   requestAnimationFrame( render );
